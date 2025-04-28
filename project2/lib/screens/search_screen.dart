@@ -35,6 +35,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _searchBooks(String query) async {
+    if (query.trim().isEmpty) return;
     setState(() {
       _query = query;
       _startIndex = 0;
@@ -75,47 +76,147 @@ class _SearchScreenState extends State<SearchScreen> {
         _isLoading = false;
         _isInitialLoading = false;
       });
-      throw Exception('Failed to load books');
     }
   }
 
-  Widget _buildBookItem(Book book) {
-    return ListTile(
-      leading:
-          book.thumbnail.isNotEmpty
-              ? Image.network(book.thumbnail, width: 50, fit: BoxFit.cover)
-              : const Icon(Icons.book, size: 50),
-      title: Text(book.title),
-      subtitle: Text(book.authors.join(', ')),
+  Widget _buildBookCard(Book book) {
+    return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => BookDetailScreen(book: book)),
         );
       },
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child:
+                    book.thumbnail.isNotEmpty
+                        ? Image.network(
+                          book.thumbnail,
+                          width: 80,
+                          height: 120,
+                          fit: BoxFit.cover,
+                        )
+                        : Container(
+                          width: 80,
+                          height: 120,
+                          color: Colors.grey,
+                          child: Icon(Icons.book, size: 40),
+                        ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      book.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      book.description.isNotEmpty
+                          ? (book.description.length > 100
+                              ? '${book.description.substring(0, 100)}...'
+                              : book.description)
+                          : 'No description',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.favorite_border, size: 20),
+                        const SizedBox(width: 8),
+                        Row(
+                          children: List.generate(
+                            5,
+                            (index) => Icon(
+                              Icons.star,
+                              size: 20,
+                              color:
+                                  index < book.rating.round()
+                                      ? Colors.amber
+                                      : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildShimmerItem() {
-    return ListTile(
-      leading: Shimmer.fromColors(
-        baseColor: Colors.grey[300]!,
-        highlightColor: Colors.grey[100]!,
-        child: Container(width: 50, height: 70, color: Colors.white),
-      ),
-      title: Shimmer.fromColors(
-        baseColor: Colors.grey[300]!,
-        highlightColor: Colors.grey[100]!,
-        child: Container(
-          height: 15,
-          width: double.infinity,
-          color: Colors.white,
+  Widget _buildShimmerCard() {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(width: 80, height: 120, color: Colors.white),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(
+                      height: 20,
+                      width: double.infinity,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(
+                      height: 14,
+                      width: double.infinity,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: List.generate(
+                      5,
+                      (index) => Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Icon(Icons.star, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ),
-      subtitle: Shimmer.fromColors(
-        baseColor: Colors.grey[300]!,
-        highlightColor: Colors.grey[100]!,
-        child: Container(height: 10, width: 100, color: Colors.white),
       ),
     );
   }
@@ -151,15 +252,15 @@ class _SearchScreenState extends State<SearchScreen> {
               child:
                   _isInitialLoading
                       ? ListView.builder(
-                        itemCount: 10,
-                        itemBuilder: (context, index) => _buildShimmerItem(),
+                        itemCount: 8,
+                        itemBuilder: (context, index) => _buildShimmerCard(),
                       )
                       : ListView.builder(
                         controller: _scrollController,
                         itemCount: _books.length + (_isLoading ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index < _books.length) {
-                            return _buildBookItem(_books[index]);
+                            return _buildBookCard(_books[index]);
                           } else {
                             return const Padding(
                               padding: EdgeInsets.symmetric(vertical: 16.0),
