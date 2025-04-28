@@ -1,90 +1,176 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../services/book_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:shimmer/shimmer.dart';
 import '../models/book.dart';
 import 'book_detail_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class SearchScreen extends StatefulWidget {
   @override
-  _SearchScreenState createState() => _SearchScreenState();
+  State<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
-  List<Book> _books = [];
-  bool _loading = false;
+  final ScrollController _scrollController = ScrollController();
 
-  void _search() async {
-    if (_controller.text.isEmpty) return;
-    setState(() => _loading = true);
-    try {
-      final books = await BookService.fetchBooks(_controller.text);
+  List<Book> _books = [];
+  String _query = '';
+  int _startIndex = 0;
+  bool _isLoading = false;
+  bool _hasMore = true;
+  bool _isInitialLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 100 &&
+          !_isLoading &&
+          _hasMore) {
+        _loadMoreBooks();
+      }
+    });
+  }
+
+  Future<void> _searchBooks(String query) async {
+    setState(() {
+      _query = query;
+      _startIndex = 0;
+      _books = [];
+      _hasMore = true;
+      _isInitialLoading = true;
+    });
+    await _loadMoreBooks();
+  }
+
+  Future<void> _loadMoreBooks() async {
+    if (_isLoading || !_hasMore || _query.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final url = Uri.parse(
+      'https://www.googleapis.com/books/v1/volumes?q=$_query&startIndex=$_startIndex&maxResults=20',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final newBooksJson = data['items'] ?? [];
+      final newBooks =
+          newBooksJson.map<Book>((json) => Book.fromJson(json)).toList();
+
       setState(() {
-        _books = books;
-        _loading = false;
+        _startIndex += 20;
+        _books.addAll(newBooks);
+        _hasMore = newBooks.isNotEmpty;
+        _isLoading = false;
+        _isInitialLoading = false;
       });
-    } catch (e) {
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error searching books')));
+    } else {
+      setState(() {
+        _isLoading = false;
+        _isInitialLoading = false;
+      });
+      throw Exception('Failed to load books');
     }
+  }
+
+  Widget _buildBookItem(Book book) {
+    return ListTile(
+      leading:
+          book.thumbnail.isNotEmpty
+              ? Image.network(book.thumbnail, width: 50, fit: BoxFit.cover)
+              : const Icon(Icons.book, size: 50),
+      title: Text(book.title),
+      subtitle: Text(book.authors.join(', ')),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => BookDetailScreen(book: book)),
+        );
+      },
+    );
+  }
+
+  Widget _buildShimmerItem() {
+    return ListTile(
+      leading: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(width: 50, height: 70, color: Colors.white),
+      ),
+      title: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          height: 15,
+          width: double.infinity,
+          color: Colors.white,
+        ),
+      ),
+      subtitle: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(height: 10, width: 100, color: Colors.white),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Search Books')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: 'Enter book title...',
-                    ),
-                    onSubmitted: (_) => _search(),
-                  ),
+      appBar: AppBar(title: const Text('Search Books')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                labelText: 'Search books...',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: () => _searchBooks(_controller.text),
                 ),
-                IconButton(icon: Icon(Icons.search), onPressed: _search),
-              ],
+              ),
+              onSubmitted: (value) => _searchBooks(value),
             ),
-          ),
-          Expanded(
-            child:
-                _loading
-                    ? Center(child: CircularProgressIndicator())
-                    : ListView.builder(
-                      itemCount: _books.length,
-                      itemBuilder: (context, index) {
-                        final book = _books[index];
-                        return ListTile(
-                          leading: CachedNetworkImage(
-                            imageUrl: book.thumbnail,
-                            placeholder:
-                                (context, url) => CircularProgressIndicator(),
-                            width: 50,
-                            fit: BoxFit.cover,
-                          ),
-                          title: Text(book.title),
-                          subtitle: Text(book.authors.join(', ')),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => BookDetailScreen(book: book),
-                              ),
+            const SizedBox(height: 16),
+            Expanded(
+              child:
+                  _isInitialLoading
+                      ? ListView.builder(
+                        itemCount: 10,
+                        itemBuilder: (context, index) => _buildShimmerItem(),
+                      )
+                      : ListView.builder(
+                        controller: _scrollController,
+                        itemCount: _books.length + (_isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index < _books.length) {
+                            return _buildBookItem(_books[index]);
+                          } else {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                              child: Center(child: CircularProgressIndicator()),
                             );
-                          },
-                        );
-                      },
-                    ),
-          ),
-        ],
+                          }
+                        },
+                      ),
+            ),
+          ],
+        ),
       ),
     );
   }
