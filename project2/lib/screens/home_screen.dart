@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import '../models/book.dart';
 import 'book_detail_screen.dart';
 import 'search_screen.dart';
+import '../widgets/app_drawer.dart' as widgets; // Import the custom AppDrawer with alias
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -87,20 +88,19 @@ class _HomeScreenState extends State<HomeScreen> {
               // Book Thumbnail
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child:
-                    book.thumbnail.isNotEmpty
-                        ? Image.network(
-                          book.thumbnail,
-                          width: 80,
-                          height: 120,
-                          fit: BoxFit.cover,
-                        )
-                        : Container(
-                          width: 80,
-                          height: 120,
-                          color: Colors.grey,
-                          child: Icon(Icons.book, size: 40),
-                        ),
+                child: book.thumbnail.isNotEmpty
+                    ? Image.network(
+                        book.thumbnail,
+                        width: 80,
+                        height: 120,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: 80,
+                        height: 120,
+                        color: Colors.grey,
+                        child: Icon(Icons.book, size: 40),
+                      ),
               ),
               const SizedBox(width: 16),
               // Book Info
@@ -135,10 +135,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             (index) => Icon(
                               Icons.star,
                               size: 20,
-                              color:
-                                  index < book.rating.round()
-                                      ? Colors.amber
-                                      : Colors.grey,
+                              color: index < book.rating.round()
+                                  ? Colors.amber
+                                  : Colors.grey,
                             ),
                           ),
                         ),
@@ -221,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: AppDrawer(),
+      drawer: const widgets.AppDrawer(), // Use the custom AppDrawer
       appBar: AppBar(
         title: const Text('Popular Books'),
         actions: [
@@ -238,26 +237,25 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child:
-            _isInitialLoading
-                ? ListView.builder(
-                  itemCount: 8,
-                  itemBuilder: (context, index) => _buildShimmerCard(),
-                )
-                : ListView.builder(
-                  controller: _scrollController,
-                  itemCount: _books.length + (_isLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index < _books.length) {
-                      return _buildBookCard(_books[index]);
-                    } else {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                  },
-                ),
+        child: _isInitialLoading
+            ? ListView.builder(
+                itemCount: 8,
+                itemBuilder: (context, index) => _buildShimmerCard(),
+              )
+            : ListView.builder(
+                controller: _scrollController,
+                itemCount: _books.length + (_isLoading ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index < _books.length) {
+                    return _buildBookCard(_books[index]);
+                  } else {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                },
+              ),
       ),
     );
   }

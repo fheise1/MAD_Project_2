@@ -37,6 +37,7 @@ class AppDrawer extends StatelessWidget {
             title: const Text('Your Profile'),
             onTap: () {
               Navigator.pop(context);
+              print('Navigating to /profile'); // Debugging
               Navigator.pushNamed(context, '/profile');
             },
           ),

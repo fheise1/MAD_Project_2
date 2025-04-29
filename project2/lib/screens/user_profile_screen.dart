@@ -109,10 +109,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
             SizedBox(height: 24),
 
+            // Reading Lists
             _buildReadingListSection('Want to Read', 'want_to_read'),
             _buildReadingListSection('Currently Reading', 'currently_reading'),
             _buildReadingListSection('Finished', 'finished'),
 
+            // Your Reviews Section
             Text(
               'Your Reviews',
               style: TextStyle(
