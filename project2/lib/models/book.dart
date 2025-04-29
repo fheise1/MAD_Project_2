@@ -15,15 +15,28 @@ class Book {
     required this.rating,
   });
 
+  // For Google Books API
   factory Book.fromJson(Map<String, dynamic> json) {
-    final volumeInfo = json['volumeInfo'];
+    final volumeInfo = json['volumeInfo'] ?? {};
     return Book(
-      id: json['id'],
+      id: json['id'] ?? '',
       title: volumeInfo['title'] ?? 'No Title',
-      authors: (volumeInfo['authors'] as List<dynamic>?)?.cast<String>() ?? [],
+      authors: (volumeInfo['authors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       description: volumeInfo['description'] ?? '',
       thumbnail: volumeInfo['imageLinks']?['thumbnail'] ?? '',
       rating: (volumeInfo['averageRating'] ?? 0).toDouble(),
+    );
+  }
+
+  // For Firestore data
+  factory Book.fromFirestore(Map<String, dynamic> json) {
+    return Book(
+      id: json['id'] ?? '',
+      title: json['title'] ?? 'No Title',
+      authors: (json['authors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      description: json['description'] ?? '',
+      thumbnail: json['thumbnail'] ?? '',
+      rating: (json['rating'] ?? 0).toDouble(),
     );
   }
 }
