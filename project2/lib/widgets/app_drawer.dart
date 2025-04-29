@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 class AppDrawer extends StatelessWidget {
+  const AppDrawer({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
+          const DrawerHeader(
             decoration: BoxDecoration(color: Colors.blue),
             child: Text(
               'Menu',
@@ -15,41 +17,41 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           ListTile(
-            leading: Icon(Icons.home),
-            title: Text('Home'),
+            leading: const Icon(Icons.home),
+            title: const Text('Home'),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushReplacementNamed(context, '/');
             },
           ),
           ListTile(
-            leading: Icon(Icons.search),
-            title: Text('Search Books'),
+            leading: const Icon(Icons.search),
+            title: const Text('Search Books'),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/search');
             },
           ),
           ListTile(
-            leading: Icon(Icons.person),
-            title: Text('Your Profile'),
+            leading: const Icon(Icons.person),
+            title: const Text('Your Profile'),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/profile');
             },
           ),
           ListTile(
-            leading: Icon(Icons.forum),
-            title: Text('Discussion Board'),
+            leading: const Icon(Icons.forum),
+            title: const Text('Discussion Board'),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/discussion');
             },
           ),
-          Divider(),
+          const Divider(),
           ListTile(
-            leading: Icon(Icons.settings),
-            title: Text('Settings'),
+            leading: const Icon(Icons.settings),
+            title: const Text('Settings'),
             onTap: () {
               Navigator.pop(context);
               // TODO: Add settings screen navigation
