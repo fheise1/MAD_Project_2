@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:project2/models/book.dart';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/user_profile_screen.dart';
 import 'screens/discussion_board_screen.dart';
 import 'screens/book_detail_screen.dart';
+import 'models/book.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
   await Firebase.initializeApp();
-  
   runApp(MyApp());
 }
 
