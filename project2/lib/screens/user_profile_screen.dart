@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:provider/provider.dart';
 import '../models/book.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -12,41 +11,49 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  late User _user;
-  late Future<DocumentSnapshot> _userData;
-  late Future<QuerySnapshot> _wantToReadBooks;
-  late Future<QuerySnapshot> _currentlyReadingBooks;
-  late Future<QuerySnapshot> _finishedBooks;
-  late Future<QuerySnapshot> _userReviews;
+  late User _currentUser;
 
   @override
   void initState() {
     super.initState();
-    _user = _auth.currentUser!;
-    _loadData();
+    _currentUser = _auth.currentUser!;
   }
 
-  void _loadData() {
-    _userData = _firestore.collection('users').doc(_user.uid).get();
-    _wantToReadBooks = _firestore
-        .collection('users')
-        .doc(_user.uid)
-        .collection('want_to_read')
-        .get();
-    _currentlyReadingBooks = _firestore
-        .collection('users')
-        .doc(_user.uid)
-        .collection('currently_reading')
-        .get();
-    _finishedBooks = _firestore
-        .collection('users')
-        .doc(_user.uid)
-        .collection('finished')
-        .get();
-    _userReviews = _firestore
-        .collection('reviews')
-        .where('userId', isEqualTo: _user.uid)
-        .get();
+  Future<void> _moveBookBetweenLists({
+    required String fromList,
+    required String toList,
+    required String bookId,
+  }) async {
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(_currentUser.uid)
+          .collection(fromList)
+          .doc(bookId)
+          .get();
+
+      await _firestore
+          .collection('users')
+          .doc(_currentUser.uid)
+          .collection(toList)
+          .doc(bookId)
+          .set(doc.data()!);
+
+      await _firestore
+          .collection('users')
+          .doc(_currentUser.uid)
+          .collection(fromList)
+          .doc(bookId)
+          .delete();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Book moved to $toList')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error moving book: ${e.toString()}')),
+      );
+    }
   }
 
   @override
@@ -60,26 +67,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Info Section
-            FutureBuilder<DocumentSnapshot>(
-              future: _userData,
+            StreamBuilder<DocumentSnapshot>(
+              stream: _firestore.collection('users').doc(_currentUser.uid).snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (!snapshot.hasData) {
                   return Center(child: CircularProgressIndicator());
                 }
-                if (!snapshot.hasData || !snapshot.data!.exists) {
-                  return Text('No user data found');
-                }
-                var userData = snapshot.data!.data() as Map<String, dynamic>;
+                final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                
                 return Row(
                   children: [
                     CircleAvatar(
                       radius: 40,
-                      backgroundImage: userData['photoUrl'] != null
-                          ? NetworkImage(userData['photoUrl'])
+                      backgroundImage: userData['photoUrl'] != null 
+                          ? NetworkImage(userData['photoUrl']) 
                           : null,
-                      child: userData['photoUrl'] == null
-                          ? Icon(Icons.person, size: 40)
+                      child: userData['photoUrl'] == null 
+                          ? Icon(Icons.person, size: 40) 
                           : null,
                     ),
                     SizedBox(width: 16),
@@ -94,7 +98,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           ),
                         ),
                         SizedBox(height: 4),
-                        Text('Member since ${userData['joinDate'] ?? 'unknown'}'),
+                        Text(
+                          'Member since ${userData['joinDate']?.toDate().year ?? 'unknown'}',
+                        ),
                       ],
                     ),
                   ],
@@ -103,12 +109,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
             SizedBox(height: 24),
 
-            // Reading Lists
-            _buildReadingListSection('Want to Read', _wantToReadBooks),
-            _buildReadingListSection('Currently Reading', _currentlyReadingBooks),
-            _buildReadingListSection('Finished', _finishedBooks),
+            _buildReadingListSection('Want to Read', 'want_to_read'),
+            _buildReadingListSection('Currently Reading', 'currently_reading'),
+            _buildReadingListSection('Finished', 'finished'),
 
-            // Your Reviews Section
             Text(
               'Your Reviews',
               style: TextStyle(
@@ -117,22 +121,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
             ),
             SizedBox(height: 8),
-            FutureBuilder<QuerySnapshot>(
-              future: _userReviews,
+            StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('reviews')
+                  .where('userId', isEqualTo: _currentUser.uid)
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (!snapshot.hasData) {
                   return Center(child: CircularProgressIndicator());
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Text('No reviews yet');
                 }
                 return Column(
                   children: snapshot.data!.docs.map((doc) {
-                    var review = doc.data() as Map<String, dynamic>;
+                    final review = doc.data() as Map<String, dynamic>;
                     return _buildReviewItem(
                       review['bookTitle'],
                       review['content'],
                       review['rating'],
+                      doc.id,
                     );
                   }).toList(),
                 );
@@ -144,31 +150,47 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildReadingListSection(String title, Future<QuerySnapshot> futureBooks) {
+  Widget _buildReadingListSection(String title, String collectionName) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (collectionName == 'want_to_read')
+              IconButton(
+                icon: Icon(Icons.search),
+                onPressed: () {
+                  // TODO: Implement book search to add to list
+                },
+              ),
+          ],
         ),
         SizedBox(height: 8),
-        FutureBuilder<QuerySnapshot>(
-          future: futureBooks,
+        StreamBuilder<QuerySnapshot>(
+          stream: _firestore
+              .collection('users')
+              .doc(_currentUser.uid)
+              .collection(collectionName)
+              .snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (!snapshot.hasData) {
               return Center(child: CircularProgressIndicator());
             }
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            if (snapshot.data!.docs.isEmpty) {
               return Text('No books in this list yet');
             }
             return Column(
               children: snapshot.data!.docs.map((doc) {
-                var book = Book.fromJson(doc.data() as Map<String, dynamic>);
-                return _buildBookListItem(book);
+                final book = Book.fromJson(doc.data() as Map<String, dynamic>);
+                return _buildBookListItem(book, collectionName);
               }).toList(),
             );
           },
@@ -178,7 +200,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildBookListItem(Book book) {
+  Widget _buildBookListItem(Book book, String currentList) {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
@@ -188,11 +210,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 width: 50,
                 height: 70,
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(Icons.book),
               )
             : Container(
                 width: 50,
                 height: 70,
-                color: Colors.grey,
+                color: Colors.grey[200],
                 child: Icon(Icons.book),
               ),
         title: Text(book.title),
@@ -202,19 +225,51 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             Text(' ${book.rating}'),
           ],
         ),
+        trailing: _buildListActions(book, currentList),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BookDetailScreen(book: book),
-            ),
-          );
+          // TODO: Navigate to book details
         },
       ),
     );
   }
 
-  Widget _buildReviewItem(String bookTitle, String review, int rating) {
+  Widget _buildListActions(Book book, String currentList) {
+    if (currentList == 'want_to_read') {
+      return IconButton(
+        icon: Icon(Icons.playlist_add),
+        onPressed: () => _moveBookBetweenLists(
+          fromList: 'want_to_read',
+          toList: 'currently_reading',
+          bookId: book.id,
+        ),
+      );
+    } else if (currentList == 'currently_reading') {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.check),
+            onPressed: () => _moveBookBetweenLists(
+              fromList: 'currently_reading',
+              toList: 'finished',
+              bookId: book.id,
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => _moveBookBetweenLists(
+              fromList: 'currently_reading',
+              toList: 'want_to_read',
+              bookId: book.id,
+            ),
+          ),
+        ],
+      );
+    }
+    return SizedBox.shrink();
+  }
+
+  Widget _buildReviewItem(String bookTitle, String review, int rating, String reviewId) {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8),
       child: Padding(
@@ -222,12 +277,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              bookTitle,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  bookTitle,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: () async {
+                    await _firestore
+                        .collection('reviews')
+                        .doc(reviewId)
+                        .delete();
+                  },
+                ),
+              ],
             ),
             SizedBox(height: 8),
             Row(
